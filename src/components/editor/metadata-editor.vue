@@ -81,6 +81,8 @@
                 :metadata="metadata"
                 :slides="slides"
                 :configLang="lang"
+                :editExisting="editExisting"
+                @config-reset="refreshConfig"
                 ref="mainEditor"
             >
                 <template v-slot:langModal="slotProps">
@@ -151,7 +153,7 @@ import EditorV from './editor.vue';
     }
 })
 export default class MetadataEditorV extends Vue {
-    @Prop({ default: true }) editExisting!: boolean; // true if editing existing storylines product, false if new product
+    editExisting!: boolean; // true if editing existing storylines product, false if new product
 
     configs: {
         [key: string]: StoryRampConfig | undefined;
@@ -180,6 +182,8 @@ export default class MetadataEditorV extends Vue {
     sourceCounts: any = {};
 
     created(): void {
+        this.editExisting = !!this.$route.params.editExisting;
+
         // Generate UUID for new product
         this.uuid = this.$route.params.uid ?? (this.editExisting ? undefined : uuidv4());
         this.lang = this.$route.params.lang ? this.$route.params.lang : 'en';
@@ -502,6 +506,47 @@ export default class MetadataEditorV extends Vue {
         }
     }
 
+    refreshConfig(editExisting: boolean) {
+        // Reset fields.
+        this.resetConfig();
+
+        this.editExisting = editExisting;
+
+        // Re-fetch the product from the server.
+        if (editExisting) {
+            this.loadEditor = false;
+            this.loadStatus = 'loading';
+            this.generateRemoteConfig();
+        } else {
+            this.generateNewConfig();
+            setTimeout(() => {
+                this.$router.push({
+                    name: 'metadata',
+                    params: {
+                        lang: this.lang,
+                        editExisting: false as any
+                    }
+                });
+            }, 100);
+        }
+    }
+
+    resetConfig() {
+        this.slides = [];
+        this.metadata = {
+            title: '',
+            introTitle: '',
+            introSubtitle: '',
+            logoPreview: '',
+            logoName: '',
+            contextLink: '',
+            contextLabel: '',
+            dateModified: ''
+        };
+        this.sourceCounts = {};
+        this.logoImage = undefined;
+    }
+
     /**
      * Called when 'next' button is pressed on metadata page to continue to main editor.
      */
@@ -583,7 +628,8 @@ export default class MetadataEditorV extends Vue {
                 configFileStructure: this.configFileStructure,
                 sourceCounts: this.sourceCounts,
                 metadata: this.metadata as any,
-                slides: this.slides as any
+                slides: this.slides as any,
+                editExisting: this.editExisting as any
             };
             this.$router.push({ name: 'editor', params: props });
         }
